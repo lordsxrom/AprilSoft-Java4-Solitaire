@@ -140,7 +140,7 @@ public class View implements IView {
 
     @Override
     public void updateCardImage(BufferedImage cardImage) {
-        this.tableImage = tableImage;
+        this.cardImage = cardImage;
     }
 
 }

@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.function.Consumer;
 
 
 public class Model implements IModel {
@@ -30,6 +31,7 @@ public class Model implements IModel {
 
     private void createPiles() {
         piles = new ArrayList<>();
+
         for (int i = 0; i < 13; i++) {
             Pile pile = new Pile();
             switch (i) {
@@ -86,7 +88,7 @@ public class Model implements IModel {
                 int rnd = (int) (Math.random() * pack.size());
                 Card card = pack.get(rnd);
                 if (j < i)
-                    card.setFaced(true);
+                    card.setFaced(false);
                 piles.get(i).add(card);
                 pack.remove(card);
             }
