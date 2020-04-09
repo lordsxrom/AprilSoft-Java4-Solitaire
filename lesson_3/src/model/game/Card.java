@@ -14,7 +14,7 @@ public class Card {
     private Ranks rank;
 
     private boolean isSelected = false;
-    private boolean isFaced = true;
+    private boolean isFaced = false;
 
     private BufferedImage face;
     private BufferedImage back;

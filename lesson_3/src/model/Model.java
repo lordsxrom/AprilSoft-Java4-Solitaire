@@ -9,8 +9,11 @@ import model.game.enums.States;
 import model.game.enums.Suits;
 import presenter.ModelListener;
 
+import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -87,8 +90,8 @@ public class Model implements IModel {
             for (int j = 6; j <= i; j++) {
                 int rnd = (int) (Math.random() * pack.size());
                 Card card = pack.get(rnd);
-                if (j < i)
-                    card.setFaced(false);
+                if (j == i)
+                    card.setFaced(true);
                 piles.get(i).add(card);
                 pack.remove(card);
             }
@@ -112,9 +115,15 @@ public class Model implements IModel {
                     Card card = pile.get(pile.size() - 1);
                     img = drawCard(card);
                 } else {
-//                    img = new BufferedImage(Utils.CARD_WIDTH, Utils.CARD_HEIGHT, BufferedImage.TYPE_INT_RGB);
-//                    Graphics g = img.getGraphics();
-//                    g.drawImage(img, 0, 0, Color.GRAY, null);
+                    img = new BufferedImage(Utils.CARD_WIDTH, Utils.CARD_HEIGHT, BufferedImage.TYPE_INT_RGB);
+                    Graphics g = img.getGraphics();
+                    BufferedImage back = null;
+                    try {
+                        back = ImageIO.read(new File("img2/k1.png"));
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    g.drawImage(back, 0, 0, Color.GRAY, null);
                 }
                 break;
             }
