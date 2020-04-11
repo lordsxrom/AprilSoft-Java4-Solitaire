@@ -40,11 +40,6 @@ public class Presenter implements IPresenter {
         }
 
         @Override
-        public void updateCardImage(BufferedImage cardImage) {
-            view.updateCardImage(cardImage);
-        }
-
-        @Override
         public void updateState(States state) {
             view.updateState(state.ordinal());
         }
@@ -53,12 +48,17 @@ public class Presenter implements IPresenter {
     private ViewListener viewListener = new ViewListener() {
         @Override
         public void onMouseDragged(int mX, int mY) {
-
+            model.onMouseDragged(mX, mY);
         }
 
         @Override
         public void onMouseReleased(int mX, int mY, int btnType) {
-
+            model.onLeftMouseReleased(mX, mY);
+            if (btnType == MouseEvent.BUTTON1) {
+                model.onLeftMouseReleased(mX, mY);
+            } else if (btnType == MouseEvent.BUTTON3) {
+                model.onRightMouseReleased(mX, mY);
+            }
         }
 
         @Override

@@ -7,7 +7,9 @@ public interface IModel {
 
     void onMouseDragged(int mX, int mY);
 
-    void onMouseReleased(int mX, int mY);
+    void onLeftMouseReleased(int mX, int mY);
+
+    void onRightMouseReleased(int mX, int mY);
 
     void onMousePressed(int mX, int mY);
 

@@ -9,6 +9,7 @@ public class Pile {
 
     private ArrayList<Card> cards;
     private Piles type;
+    private Coord coord;
 
     public Pile() {
         cards = new ArrayList<>();
@@ -57,4 +58,13 @@ public class Pile {
     public ArrayList<Card> getCards() {
         return cards;
     }
+
+    public Coord getCoord() {
+        return coord;
+    }
+
+    public void setCoord(Coord coord) {
+        this.coord = coord;
+    }
+
 }
