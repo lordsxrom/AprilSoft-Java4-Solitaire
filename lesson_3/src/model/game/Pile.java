@@ -27,10 +27,6 @@ public class Pile {
         cards.addAll(elem);
     }
 
-    public void remove(int nom) {
-        cards.remove(nom);
-    }
-
     public void remove(Card card) {
         cards.remove(card);
     }
@@ -57,6 +53,12 @@ public class Pile {
 
     public ArrayList<Card> getCards() {
         return cards;
+    }
+
+    public Card getLast() {
+        if (cards.isEmpty())
+            return null;
+        return cards.get(cards.size() - 1);
     }
 
     public Coord getCoord() {

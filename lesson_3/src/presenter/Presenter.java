@@ -53,7 +53,6 @@ public class Presenter implements IPresenter {
 
         @Override
         public void onMouseReleased(int mX, int mY, int btnType) {
-            model.onLeftMouseReleased(mX, mY);
             if (btnType == MouseEvent.BUTTON1) {
                 model.onLeftMouseReleased(mX, mY);
             } else if (btnType == MouseEvent.BUTTON3) {

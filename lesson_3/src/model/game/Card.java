@@ -13,9 +13,7 @@ public class Card {
     private Suits suit;
     private Ranks rank;
 
-    private boolean isSelected = false;
     private boolean isFaced = false;
-    private boolean isHandled = false;
     private Coord coord;
 
     private BufferedImage face;
@@ -40,14 +38,6 @@ public class Card {
         return rank;
     }
 
-    public boolean isSelected() {
-        return isSelected;
-    }
-
-    public void setSelected(boolean selected) {
-        this.isSelected = selected;
-    }
-
     public boolean isFaced() {
         return isFaced;
     }
@@ -70,14 +60,6 @@ public class Card {
 
     public void setCoord(Coord coord) {
         this.coord = coord;
-    }
-
-    public boolean isHandled() {
-        return isHandled;
-    }
-
-    public void setHandled(boolean handled) {
-        isHandled = handled;
     }
 
 }

@@ -30,10 +30,10 @@ public class Model implements IModel {
     private BufferedImage empty;
     private BufferedImage table;
 
-    private int nomStopki;
-    private int nomKarti;
-    private int dx, dy;
-    private int oldX, oldY;
+    private ArrayList<Card> handledCards = new ArrayList<>();
+    private Pile handledPill;
+    private Coord dCoord;
+    private Coord oldCoord;
 
     public Model() {
         initImages();
@@ -42,9 +42,9 @@ public class Model implements IModel {
 
     private void initImages() {
         try {
-            back = ImageIO.read(new File("img2/k0.png"));
-            empty = ImageIO.read(new File("img2/k1.png"));
-            table = ImageIO.read(new File("img2/fon.png"));
+            back = ImageIO.read(new File("img2/back.png"));
+            empty = ImageIO.read(new File("img2/empty.png"));
+            table = ImageIO.read(new File("img2/background.png"));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -86,12 +86,12 @@ public class Model implements IModel {
 
     public void start() {
         piles.forEach(Pile::clear);
+        handledCards.clear();
+        handledPill = null;
 
         dial(getCardPack());
 
         state = States.GAME;
-        nomKarti = -1;
-        nomStopki = -1;
 
         listener.updateTableImage(drawTableImage());
     }
@@ -122,59 +122,12 @@ public class Model implements IModel {
 
         Collections.shuffle(pack);
         Pile stock = piles.get(0);
-        pack.forEach(it -> it.setCoord(stock.getCoord()));
+        pack.forEach(card -> card.setCoord(stock.getCoord()));
         stock.addAll(pack);
     }
 
     private BufferedImage drawCard(Card card) {
-        BufferedImage cardImg = card.isFaced() ? card.getFace() : card.getBack();
-        if (card.isSelected()) {
-            BufferedImage selectedCardImg = new BufferedImage(Utils.CARD_WIDTH, Utils.CARD_HEIGHT, BufferedImage.TYPE_INT_RGB);
-            Graphics g = selectedCardImg.getGraphics();
-            g.setColor(Color.RED);
-            g.drawImage(cardImg, 0, 0, null);
-            g.drawRect(0, 0, Utils.CARD_WIDTH, Utils.CARD_HEIGHT);
-            return selectedCardImg;
-        }
-        return cardImg;
-    }
-
-    private BufferedImage drawPill(Pile pile) {
-        BufferedImage img = null;
-        switch (pile.getType()) {
-            case STOCK:
-            case TALON:
-            case FOUNDATION: {
-                if (pile.isEmpty()) {
-                    return empty;
-                }
-                Card card = pile.get(pile.size() - 1);
-                if (card.isHandled()) {
-                    return pile.size() < 2 ? empty : drawCard(pile.get(pile.size() - 2));
-                }
-                img = drawCard(card);
-                break;
-            }
-            case TABLEAU: {
-                if (pile.isEmpty()) {
-                    return empty;
-                }
-                long handled = pile.getCards().stream().filter(Card::isHandled).count(); // TODO
-                img = new BufferedImage(Utils.CARD_WIDTH,
-                        Utils.CARD_HEIGHT + (pile.size() - 1) * Utils.CARD_GAP,
-                        BufferedImage.TYPE_INT_RGB);
-                Graphics g = img.getGraphics();
-                int y = 0;
-                for (Card card : pile.getCards()) {
-                    if (card.isHandled())
-                        continue;
-                    g.drawImage(drawCard(card), 0, y, null);
-                    y += Utils.CARD_GAP;
-                }
-                break;
-            }
-        }
-        return img;
+        return card.isFaced() ? card.getFace() : card.getBack();
     }
 
     private BufferedImage drawTableImage() {
@@ -187,17 +140,14 @@ public class Model implements IModel {
 
         // Рисуем стопки
         for (Pile pile : piles) {
-            g.drawImage(drawPill(pile), pile.getCoord().x, pile.getCoord().y, null);
-        }
-
-        // Рисуем карты в руке
-        if (nomKarti != -1 && nomStopki != -1) {
-            Pile pile = piles.get(nomStopki);
-            for (int i = nomKarti; i < pile.size(); i++) {
-                Card card = pile.get(i);
+            g.drawImage(empty, pile.getCoord().x, pile.getCoord().y, null);
+            for (Card card : pile.getCards()) {
                 g.drawImage(drawCard(card), card.getCoord().x, card.getCoord().y, null);
             }
         }
+
+        // Рисуем карты в руке
+        handledCards.forEach(card -> g.drawImage(drawCard(card), card.getCoord().x, card.getCoord().y, null));
 
         return img;
     }
@@ -209,13 +159,10 @@ public class Model implements IModel {
 
     @Override
     public void onMouseDragged(int mX, int mY) {
-        if (nomStopki != -1 && nomKarti != -1) {
-            Pile pile = piles.get(nomStopki);
+        if (!handledCards.isEmpty()) {
             int y = 0;
-            for (int i = nomKarti; i < pile.size(); i++) {
-                Card card = pile.get(i);
-                card.setCoord(new Coord(mX - dx, mY - dy + y));
-                card.setHandled(true);
+            for (Card card : handledCards) {
+                card.setCoord(new Coord(mX - dCoord.x, mY - dCoord.y + y));
                 y += Utils.CARD_GAP;
             }
             listener.updateTableImage(drawTableImage());
@@ -224,107 +171,107 @@ public class Model implements IModel {
 
     @Override
     public void onLeftMouseReleased(int mX, int mY) {
-        int pillNumber = findPillByCoord(mX, mY);
+        if (handledCards.isEmpty())
+            return;
 
-        if (nomStopki != -1 && nomKarti != -1) {
-            Pile pile = piles.get(nomStopki);
-            pile.get(nomKarti).setSelected(false);
+        int pillNumber = Utils.findPillByCoord(mX, mY);
+        if (pillNumber == -1 || !isCardLayDown(pillNumber)) {
+            int y = 0;
+            for (Card card : handledCards) {
+                card.setCoord(new Coord(oldCoord.x, oldCoord.y + y));
+                y += Utils.CARD_GAP;
+            }
+        } else {
+            Pile pile = piles.get(pillNumber);
+            switch (pile.getType()) {
+                case FOUNDATION: {
+                    for (Card card : handledCards) {
+                        card.setCoord(new Coord(pile.getCoord().x, pile.getCoord().y));
+                        pile.add(card);
+                        handledPill.remove(card);
+                    }
+                    break;
+                }
+                case TABLEAU: {
+                    Coord coord = pile.isEmpty() ? pile.getCoord() : pile.getLast().getCoord();
+                    int y = pile.isEmpty() ? 0 : Utils.CARD_GAP;
 
-            if (pillNumber == -1 || !isCardLayDown(nomStopki, pillNumber)) {
-                for (int i = nomKarti; i < piles.get(nomStopki).size(); i++) {
-                    Card card = piles.get(nomStopki).get(i);
-                    card.setCoord(new Coord(oldX, oldY));
-                    card.setHandled(false);
+                    for (Card card : handledCards) {
+                        card.setCoord(new Coord(coord.x, coord.y + y));
+                        y += Utils.CARD_GAP;
+                        pile.add(card);
+                        handledPill.remove(card);
+                    }
+                    break;
                 }
             }
-
-            nomStopki = -1;
-            nomKarti = -1;
-            openClosedTableauCards();
-
-            listener.updateTableImage(drawTableImage());
         }
+
+        handledPill = null;
+        handledCards.clear();
+
+        openClosedTableauCards();
+        testEndGame();
+
+        listener.updateTableImage(drawTableImage());
     }
 
     @Override
     public void onRightMouseReleased(int mX, int mY) {
+        for (Pile pile : piles) {
+            if (pile.getType() == Piles.TALON || pile.getType() == Piles.TABLEAU) {
+                if (pile.isEmpty()) continue;
 
-    }
+                Card card = pile.getLast();
+                for (Pile foundation : piles) {
+                    if (foundation.getType() == Piles.FOUNDATION) {
+                        Card card_ = foundation.getLast();
+                        if (Utils.isFitToFoundation(card, card_)) {
+                            card.setCoord(foundation.getCoord());
+                            foundation.add(card);
+                            pile.remove(card);
 
-    private boolean isCardLayDown(int pillNumber_1, int pillNumber_2) {
-        boolean result = false;
-
-        Pile pill_1 = piles.get(pillNumber_1);
-        Pile pill_2 = piles.get(pillNumber_2);
-
-        Card card_1 = pill_1.get(nomKarti);
-        Card card_2 = null;
-
-        if (pill_2.size() > 0) {
-            card_2 = pill_2.get(pill_2.size() - 1);
-        }
-
-        if (pill_2.getType() == Piles.FOUNDATION) {
-            if (nomKarti == (pill_1.size() - 1)) {
-                if (card_2 == null) {
-                    if (card_1.getRank() == Ranks.ACE)
-                        result = true;
-                } else if (Ranks.isFitToFoundation(card_1.getRank(), card_2.getRank()) &&
-                        Suits.isSame(card_1.getSuit(), card_2.getSuit())) {
-                    result = true;
-                }
-
-                if (result) {
-                    card_1.setCoord(new Coord((110 * (pillNumber_2 + 1)) + 30, 15));
-                    card_1.setHandled(false);
-                    pill_2.add(card_1);
-                    pill_1.remove(nomKarti);
-
-                    testEndGame();
+                            openClosedTableauCards();
+                            testEndGame();
+                            listener.updateTableImage(drawTableImage());
+                            break;
+                        }
+                    }
                 }
             }
+        }
+    }
+
+    private boolean isCardLayDown(int pillNumber) {
+        Pile pill_2 = piles.get(pillNumber);
+
+        Card card_1 = handledCards.get(0);
+        Card card_2 = pill_2.getLast();
+
+        if (pill_2.getType() == Piles.FOUNDATION) {
+            return Utils.isFitToFoundation(card_1, card_2);
         }
 
         if (pill_2.getType() == Piles.TABLEAU) {
-            int x = pill_2.getCoord().x;
-            int y = pill_2.getCoord().y;
-
-            if (card_2 == null) {
-                if (card_1.getRank() == Ranks.KING)
-                    result = true;
-            } else {
-                if (card_2.isFaced() &&
-                        Ranks.isFitToTableau(card_1.getRank(), card_2.getRank()) &&
-                        !Suits.isSimilar(card_1.getSuit(), card_2.getSuit())) {
-                    y = card_2.getCoord().y + Utils.CARD_GAP;
-                    result = true;
-                }
-            }
-
-            if (result) {
-                for (int i = nomKarti; i < pill_1.size(); i++) {
-                    Card card = pill_1.get(i);
-                    card.setCoord(new Coord(x, y));
-                    card.setHandled(false);
-                    pill_2.add(card);
-                    y += Utils.CARD_GAP;
-                }
-                for (int i = pill_1.size() - 1; i >= nomKarti; i--) {
-                    pill_1.remove(i);
-                }
-            }
+            return Utils.isFitToTableau(card_1, card_2);
         }
 
-        return result;
+        return false;
     }
 
     private void testEndGame() {
-
+        if (piles.get(2).size() == 13
+                && piles.get(3).size() == 13
+                && piles.get(4).size() == 13
+                && piles.get(5).size() == 13) {
+            state = States.WIN;
+            listener.updateState(state);
+        }
     }
 
     @Override
     public void onMousePressed(int mX, int mY) {
-        int pillNumber = findPillByCoord(mX, mY);
+        int pillNumber = Utils.findPillByCoord(mX, mY);
         if (pillNumber == -1)
             return;
 
@@ -352,42 +299,30 @@ public class Model implements IModel {
                 break;
             }
             case FOUNDATION:
-            case TALON: {
-                if (!pile.isEmpty()) {
-                    int cardNumber = pile.size() - 1;
-                    Card card = pile.get(cardNumber);
-                    card.setSelected(true);
-
-                    nomKarti = cardNumber;
-                    nomStopki = pillNumber;
-
-                    dx = mX - card.getCoord().x;
-                    dy = mY - card.getCoord().y;
-
-                    oldX = card.getCoord().x;
-                    oldY = card.getCoord().y;
-                }
-                break;
-            }
+            case TALON:
             case TABLEAU: {
-                if (!pile.isEmpty()) {
-                    int cardNumber = (mY - 130) / Utils.CARD_GAP;
-                    if (cardNumber >= pile.size() || !pile.get(cardNumber).isFaced()) {
-                        return;
-                    }
+                if (pile.isEmpty()) return;
 
-                    Card card = pile.get(cardNumber);
-                    card.setSelected(true);
-
-                    nomKarti = cardNumber;
-                    nomStopki = pillNumber;
-
-                    dx = mX - card.getCoord().x;
-                    dy = mY - card.getCoord().y;
-
-                    oldX = card.getCoord().x;
-                    oldY = card.getCoord().y;
+                int cardNumber;
+                if (mY >= pile.getLast().getCoord().y && mY <= pile.getLast().getCoord().y + Utils.CARD_HEIGHT) {
+                    cardNumber = pile.size() - 1;
+                } else {
+                    cardNumber = (mY - pile.getCoord().y) / Utils.CARD_GAP;
                 }
+
+                if (cardNumber >= pile.size() || !pile.get(cardNumber).isFaced()) {
+                    return;
+                }
+
+                for (int i = cardNumber; i < pile.size(); i++) {
+                    Card card = pile.get(i);
+                    handledCards.add(card);
+                }
+                handledPill = pile;
+
+                dCoord = new Coord(mX - pile.get(cardNumber).getCoord().x, mY - pile.get(cardNumber).getCoord().y);
+                oldCoord = new Coord(pile.get(cardNumber).getCoord().x, pile.get(cardNumber).getCoord().y);
+
                 break;
             }
         }
@@ -397,7 +332,30 @@ public class Model implements IModel {
 
     @Override
     public void onMouseDoublePressed(int mX, int mY) {
+        int pillNumber = Utils.findPillByCoord(mX, mY);
+        if (pillNumber == -1) return;
 
+        Pile pile = piles.get(pillNumber);
+        if (pile.isEmpty()) return;
+
+        if (pile.getType() == Piles.TALON || pile.getType() == Piles.TABLEAU) {
+            Card card = pile.getLast();
+            for (Pile foundation : piles) {
+                if (foundation.getType() == Piles.FOUNDATION) {
+                    Card card_ = foundation.getLast();
+                    if (Utils.isFitToFoundation(card, card_)) {
+                        card.setCoord(foundation.getCoord());
+                        foundation.add(card);
+                        pile.remove(card);
+
+                        openClosedTableauCards();
+                        testEndGame();
+                        listener.updateTableImage(drawTableImage());
+                        return;
+                    }
+                }
+            }
+        }
     }
 
     @Override
@@ -405,34 +363,11 @@ public class Model implements IModel {
         start();
     }
 
-    private int findPillByCoord(int mX, int mY) {
-        int nom = -1;
-
-        if (mY >= 15 && mY <= (15 + Utils.CARD_HEIGHT)) {
-            if ((mX >= 30) && (mX <= (30 + Utils.CARD_WIDTH))) nom = 0;
-            if ((mX >= 140) && (mX <= (140 + Utils.CARD_WIDTH))) nom = 1;
-            if ((mX >= 360) && (mX <= (360 + Utils.CARD_WIDTH))) nom = 2;
-            if ((mX >= 470) && (mX <= (470 + Utils.CARD_WIDTH))) nom = 3;
-            if ((mX >= 580) && (mX <= (580 + Utils.CARD_WIDTH))) nom = 4;
-            if ((mX >= 690) && (mX <= (690 + Utils.CARD_WIDTH))) nom = 5;
-        } else if ((mY >= 130) && (mY <= Utils.TABLE_HEIGHT)) {
-            if ((mX >= 30) && (mX <= (30 + Utils.CARD_WIDTH))) nom = 6;
-            if ((mX >= 140) && (mX <= (140 + Utils.CARD_WIDTH))) nom = 7;
-            if ((mX >= 250) && (mX <= (250 + Utils.CARD_WIDTH))) nom = 8;
-            if ((mX >= 360) && (mX <= (360 + Utils.CARD_WIDTH))) nom = 9;
-            if ((mX >= 470) && (mX <= (470 + Utils.CARD_WIDTH))) nom = 10;
-            if ((mX >= 580) && (mX <= (580 + Utils.CARD_WIDTH))) nom = 11;
-            if ((mX >= 690) && (mX <= (690 + Utils.CARD_WIDTH))) nom = 12;
-        }
-
-        return nom;
-    }
-
     private void openClosedTableauCards() {
-        piles.stream().filter(it -> !it.isEmpty() && it.getType() == Piles.TABLEAU).forEach(it -> {
-            Card card = it.get(it.size() - 1);
-            if (!card.isFaced())
-                card.setFaced(true);
-        });
+        piles.stream().
+                filter(it -> !it.isEmpty() && it.getType() == Piles.TABLEAU).
+                map(Pile::getLast).
+                forEach(it -> it.setFaced(true));
     }
+
 }
