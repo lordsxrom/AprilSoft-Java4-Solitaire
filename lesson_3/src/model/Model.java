@@ -249,6 +249,8 @@ public class Model implements IModel {
         Card card_2 = pill_2.getLast();
 
         if (pill_2.getType() == Piles.FOUNDATION) {
+            if (handledCards.size() != 1)
+                return false;
             return Utils.isFitToFoundation(card_1, card_2);
         }
 
